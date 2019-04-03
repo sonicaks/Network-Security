@@ -108,8 +108,11 @@ void *run(void *args) {
                         send(cli.cliFd, "250 OK", sizeof("250 OK"), 0);
 
                         vector<int> usersToSend;
-                        string msg = '\n' + to_string(logInId);
-                        msg += ' ';
+                        string msg;
+                        msg += "\nFROM: ";
+                        msg += to_string(logInId);
+                        msg += "@mymailserver";
+                        msg += "\nDATA: ";
 
                         while (1) {
                             clear(buff);
