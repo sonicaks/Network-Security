@@ -6,8 +6,17 @@
 #include <arpa/inet.h>
 #include <string.h>
 #include <unistd.h>
+#include "DES.h"
 
-#define PORT 5003
+#include <vector>
+#include <string>
+
+using namespace std;
+
+#define PORT 5004
+
+string key = "AABB09182736CCDD";
+vector<string> roundKey;
 
 void clear(char *buff) {
     int i;
@@ -36,9 +45,15 @@ int main() {
         exit(0);
     }
 
-    char rec[1024];
+    roundKey = generateRoundKey(key);
+
+    char rec[1024], decodedRec[1024];
+    clear(rec);
     recv(sockFd, rec, 1024, 0);
     printf("S: %s\n", rec);
+    clear(decodedRec);
+    strcpy(decodedRec, decode(rec, roundKey).data());
+    printf("S: %s\n", decodedRec);
 
     char *msg[] = {"REGISTER", "LOGIN", "COMPOSE", "INBOX", "QUIT"};
 
@@ -46,10 +61,12 @@ int main() {
 
     while (1) {
         /* Send message to server */
-        char buff[1024];
+        char buff[1024], msgToSend[1024], decodedBuff[1024];
         printf("C: ");
         scanf("%s", buff);
-        send(sockFd, buff, 1024, 0);
+        clear(msgToSend);
+        strcpy(msgToSend, encode(buff, roundKey).data());
+        send(sockFd, msgToSend, sizeof(msgToSend), 0);
 
         int idx = -1, i;
         
@@ -67,15 +84,23 @@ int main() {
                 {
                     clear(buff);
                     recv(sockFd, buff, 1024, 0);
-                    printf("S: %s", buff);
+                    printf("S: %s\n", buff);
+                    clear(decodedBuff);
+                    strcpy(decodedBuff, decode(buff, roundKey).data());
+                    printf("S: %s", decodedBuff);
 
                     clear(buff);
                     scanf("%s", buff);
-                    send(sockFd, buff, 1024, 0);
+                    clear(msgToSend);
+                    strcpy(msgToSend, encode(buff, roundKey).data());
+                    send(sockFd, msgToSend, sizeof(msgToSend), 0);
 
                     clear(buff);
                     recv(sockFd, buff, 1024, 0);
                     printf("S: %s\n", buff);
+                    clear(decodedBuff);
+                    strcpy(decodedBuff, decode(buff, roundKey).data());
+                    printf("S: %s\n", decodedBuff);
                 }
 
                 break;
@@ -85,15 +110,23 @@ int main() {
                 {
                     clear(buff);
                     recv(sockFd, buff, 1024, 0);
-                    printf("S: %s", buff);
+                    printf("S: %s\n", buff);
+                    clear(decodedBuff);
+                    strcpy(decodedBuff, decode(buff, roundKey).data());
+                    printf("S: %s", decodedBuff);
 
                     clear(buff);
                     scanf("%s", buff);
-                    send(sockFd, buff, 1024, 0);
+                    clear(msgToSend);
+                    strcpy(msgToSend, encode(buff, roundKey).data());
+                    send(sockFd, msgToSend, sizeof(msgToSend), 0);
 
                     clear(buff);
                     recv(sockFd, buff, 1024, 0);
                     printf("S: %s\n", buff);
+                    clear(decodedBuff);
+                    strcpy(decodedBuff, decode(buff, roundKey).data());
+                    printf("S: %s\n", decodedBuff);
                 }
                 
                 break;
@@ -104,8 +137,11 @@ int main() {
                     clear(buff);
                     recv(sockFd, buff, 1024, 0);
                     printf("S: %s\n", buff);
+                    clear(decodedBuff);
+                    strcpy(decodedBuff, decode(buff, roundKey).data());
+                    printf("S: %s\n", decodedBuff);
 
-                    if (strcmp(buff, "250 OK") == 0) {
+                    if (strcmp(decodedBuff, "250 OK") == 0) {
                         while (1) {
                             printf("C: REPT or DATA: ");
                             clear(buff);
@@ -121,23 +157,35 @@ int main() {
                                 buff[4] = ':';
                                 buff[5] = ' ';
                                 scanf("%s", buff + 6);
-                                send(sockFd, buff, 1024, 0);
+                                clear(msgToSend);
+                                strcpy(msgToSend, encode(buff, roundKey).data());
+                                send(sockFd, msgToSend, sizeof(msgToSend), 0);
 
                                 clear(buff);
                                 recv(sockFd, buff, 1024, 0);
                                 printf("S: %s\n", buff);
+                                clear(decodedBuff);
+                                strcpy(decodedBuff, decode(buff, roundKey).data());
+                                printf("S: %s\n", decodedBuff);
                             } else {
-                                send(sockFd, "DATA", sizeof("DATA"), 0);
+                                clear(msgToSend);
+                                strcpy(msgToSend, encode("DATA", roundKey).data());
+                                send(sockFd, msgToSend, sizeof(msgToSend), 0);
 
                                 clear(buff);
                                 recv(sockFd, buff, 1024, 0);
                                 printf("S: %s\n", buff);
+                                clear(decodedBuff);
+                                strcpy(decodedBuff, decode(buff, roundKey).data());
+                                printf("S: %s\n", decodedBuff);
 
                                 while (1) {
                                     printf("C: ");
                                     clear(buff);
                                     scanf("%s", buff);
-                                    send(sockFd, buff, 1024, 0);
+                                    clear(msgToSend);
+                                    strcpy(msgToSend, encode(buff, roundKey).data());
+                                    send(sockFd, msgToSend, sizeof(msgToSend), 0);
 
                                     if (strcmp(buff, "X.X") == 0) break;
                                 }
@@ -156,11 +204,17 @@ int main() {
                     clear(buff);
                     recv(sockFd, buff, 1024, 0);
                     printf("S: %s\n", buff);
+                    clear(decodedBuff);
+                    strcpy(decodedBuff, decode(buff, roundKey).data());
+                    printf("S: %s\n", decodedBuff);
 
-                    if (strcmp(buff, "250 OK") == 0) {
+                    if (strcmp(decodedBuff, "250 OK") == 0) {
                         clear(buff);
                         recv(sockFd, buff, 1024, 0);
                         printf("S: %s\n", buff);
+                        clear(decodedBuff);
+                        strcpy(decodedBuff, decode(buff, roundKey).data());
+                        printf("S: %s\n", decodedBuff);
                     }
                 }
 
@@ -169,7 +223,9 @@ int main() {
             case 4:
                 {
                     clear(buff);
-                    send(sockFd, "221 Connection Closed", sizeof("221 Connection Closed"), 0);
+                    clear(msgToSend);
+                    strcpy(msgToSend, encode("221 Connection Closed", roundKey).data());
+                    send(sockFd, msgToSend, sizeof(msgToSend), 0);
                     ex = 1;
                 }
 

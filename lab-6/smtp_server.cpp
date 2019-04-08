@@ -7,13 +7,14 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include "DES.h"
 
 #include <vector>
 #include <string>
 
 using namespace std;
 
-#define PORT 5003
+#define PORT 5004
 
 struct client {
     int cliFd;
@@ -29,6 +30,8 @@ void clear(char *buff) {
 int reg[105];
 int logIn[105];
 vector<string> inbox[105];
+string key = "AABB09182736CCDD";
+vector<string> roundKey;
 
 void *run(void *args) {
     struct client cli = *(struct client *)args;
@@ -42,13 +45,15 @@ void *run(void *args) {
         int i, idx = -1;
 
         /* Receive */
-        char buff[1024];
+        char buff[1024], msgToSend[1024], decodedBuff[1024];
 
         clear(buff);
+        clear(decodedBuff);
         recv(cli.cliFd, buff, 1024, 0);
+        strcpy(decodedBuff, decode(buff, roundKey).data());
 
         for (i = 0; i < 5; i++) {
-            if (strcmp(msg[i], buff) == 0) {
+            if (strcmp(msg[i], decodedBuff) == 0) {
                 idx = i;
                 break ;
             }
@@ -58,19 +63,27 @@ void *run(void *args) {
             case 0:
                 /* Handle registration below */
                 {
-                    send(cli.cliFd, "Enter a number denoting your username: ", sizeof("Enter a number denoting your username: "), 0);
+                    clear(msgToSend);
+                    strcpy(msgToSend, encode("Enter a number denoting your username: ", roundKey).data());
+                    send(cli.cliFd, msgToSend, sizeof(msgToSend), 0);
                     clear(buff);
+                    clear(decodedBuff);
                     recv(cli.cliFd, buff, 1024, 0);
+                    strcpy(decodedBuff, decode(buff, roundKey).data());
 
                     int id = 0;
-                    for (i = 0; buff[i] != '\0'; i++) {
-                        id = id * 10 + (buff[i] - '0');
+                    for (i = 0; decodedBuff[i] != '\0'; i++) {
+                        id = id * 10 + (decodedBuff[i] - '0');
                     }
                     if (reg[id]) {
-                        send(cli.cliFd, "Username already taken", sizeof("Username already taken"), 0);
+                        clear(msgToSend);
+                        strcpy(msgToSend, encode("Username already taken", roundKey).data());
+                        send(cli.cliFd, msgToSend, sizeof(msgToSend), 0);
                     } else {
                         reg[id] = 1;
-                        send(cli.cliFd, "250 OK", sizeof("250 OK"), 0);
+                        clear(msgToSend);
+                        strcpy(msgToSend, encode("250 OK", roundKey).data());
+                        send(cli.cliFd, msgToSend, sizeof(msgToSend), 0);
                     }
                 }
 
@@ -79,21 +92,29 @@ void *run(void *args) {
             case 1:
                 /* Handle login below */
                 {
-                    send(cli.cliFd, "Enter your email: ", sizeof("Enter your email: "), 0);
+                    clear(msgToSend);
+                    strcpy(msgToSend, encode("Enter your email: ", roundKey).data());
+                    send(cli.cliFd, msgToSend, sizeof(msgToSend), 0);
 
                     clear(buff);
+                    clear(decodedBuff);
                     recv(cli.cliFd, buff, 1024, 0);
+                    strcpy(decodedBuff, decode(buff, roundKey).data());
                     
                     int id = 0;
-                    for (i = 0; buff[i] != '\0'; i++) {
-                        id = id * 10 + (buff[i] - '0');
+                    for (i = 0; decodedBuff[i] != '\0'; i++) {
+                        id = id * 10 + (decodedBuff[i] - '0');
                     }
                     if (reg[id]) {
-                        send(cli.cliFd, "250 OK", sizeof("250 OK"), 0);
+                        clear(msgToSend);
+                        strcpy(msgToSend, encode("250 OK", roundKey).data());
+                        send(cli.cliFd, msgToSend, sizeof(msgToSend), 0);
                         logIn[id] = 1;
                         logInId = id;
                     } else {
-                        send(cli.cliFd, "Please register", sizeof("Please register"), 0);
+                        clear(msgToSend);
+                        strcpy(msgToSend, encode("Please register", roundKey).data());
+                        send(cli.cliFd, msgToSend, sizeof(msgToSend), 0);
                     }
                 }
 
@@ -103,12 +124,16 @@ void *run(void *args) {
                 /* Handle message composition */
                 {
                     if (!logInId) {
-                        send(cli.cliFd, "Please login", sizeof("Please login"), 0);
+                        clear(msgToSend);
+                        strcpy(msgToSend, encode("Please login", roundKey).data());
+                        send(cli.cliFd, msgToSend, sizeof(msgToSend), 0);
                     } else {
-                        send(cli.cliFd, "250 OK", sizeof("250 OK"), 0);
+                        clear(msgToSend);
+                        strcpy(msgToSend, encode("250 OK", roundKey).data());
+                        send(cli.cliFd, msgToSend, sizeof(msgToSend), 0);
 
                         vector<int> usersToSend;
-                        string msg;
+                        string msg = "";
                         msg += "\nFROM: ";
                         msg += to_string(logInId);
                         msg += "@mymailserver";
@@ -116,36 +141,47 @@ void *run(void *args) {
 
                         while (1) {
                             clear(buff);
+                            clear(decodedBuff);
                             recv(cli.cliFd, buff, 1024, 0);
+                            strcpy(decodedBuff, decode(buff, roundKey).data());
 
                             int sendId = 0;
                             int ok = 0;
-                            for (i = 0; buff[i] != '\0'; i++) {
-                                if (buff[i] >= '0' && buff[i] <= '9') {
+                            for (i = 0; decodedBuff[i] != '\0'; i++) {
+                                if (decodedBuff[i] >= '0' && decodedBuff[i] <= '9') {
                                     ok = 1;
-                                    sendId = sendId * 10 + (buff[i] - '0');
+                                    sendId = sendId * 10 + (decodedBuff[i] - '0');
                                 }
                             }
                             
                             if (ok) {
                                 if (!reg[sendId]) {
-                                    send(cli.cliFd, "550 No such user here", sizeof("550 No such user here"), 0);
+                                    clear(msgToSend);
+                                    strcpy(msgToSend, encode("550 No such user here", roundKey).data());
+                                    send(cli.cliFd, msgToSend, sizeof(msgToSend), 0);
                                 } else {
                                     usersToSend.push_back(sendId);
-                                    send(cli.cliFd, "250 OK", sizeof("250 OK"), 0);
+                                    clear(msgToSend);
+                                    strcpy(msgToSend, encode("250 OK", roundKey).data());
+                                    send(cli.cliFd, msgToSend, sizeof(msgToSend), 0);
                                 }
                             } else {
                                 /* Indicates client has sent DATA */
-                                send(cli.cliFd, "354 Start mail input; end with X.X", sizeof("354 Start mail input; end with X.X"), 0);
+                                clear(msgToSend);
+                                strcpy(msgToSend, encode("354 Start mail input; end with X.X", roundKey).data());
+                                send(cli.cliFd, msgToSend, sizeof(msgToSend), 0);
 
                                 while (1) {
                                     clear(buff);
+                                    clear(decodedBuff);
                                     recv(cli.cliFd, buff, 1024, 0);
-                                    if (strcmp(buff, "X.X") == 0) {
+                                    strcpy(decodedBuff, decode(buff, roundKey).data());
+
+                                    if (strcmp(decodedBuff, "X.X") == 0) {
                                         break;
                                     } else {
-                                        for (i = 0; buff[i] != '\0'; i++) {
-                                            msg += buff[i];
+                                        for (i = 0; decodedBuff[i] != '\0'; i++) {
+                                            msg += decodedBuff[i];
                                         }
                                     }
                                 }
@@ -166,9 +202,13 @@ void *run(void *args) {
                 /* Handle inbox */
                 {
                     if (!logInId) {
-                        send(cli.cliFd, "Please login", sizeof("Please login"), 0);
+                        clear(msgToSend);
+                        strcpy(msgToSend, encode("Please login", roundKey).data());
+                        send(cli.cliFd, msgToSend, sizeof(msgToSend), 0);
                     } else {
-                        send(cli.cliFd, "250 OK", sizeof("250 OK"), 0);
+                        clear(msgToSend);
+                        strcpy(msgToSend, encode("250 OK", roundKey).data());
+                        send(cli.cliFd, msgToSend, sizeof(msgToSend), 0);
 
                         clear(buff);
                         int k = 0;
@@ -177,7 +217,9 @@ void *run(void *args) {
                                 buff[k++] = inbox[logInId][i][j];
                             }
                         }
-                        send(cli.cliFd, buff, 1024, 0);
+                        clear(msgToSend);
+                        strcpy(msgToSend, encode(buff, roundKey).data());
+                        send(cli.cliFd, msgToSend, sizeof(msgToSend), 0);
 
                         inbox[logInId].clear();
                     }
@@ -188,7 +230,9 @@ void *run(void *args) {
             case 4:
                 /* Quit */
                 {
-                    send(cli.cliFd, "221 Connection Closed", sizeof("221 Connection Closed"), 0);
+                    clear(msgToSend);
+                    strcpy(msgToSend, encode("221 Connection Closed", roundKey).data());
+                    send(cli.cliFd, msgToSend, sizeof(msgToSend), 0);
                     ex = 1;
                 }
             
@@ -233,6 +277,8 @@ int main() {
     /* Listen */
     listen(servFd, 5);
 
+    roundKey = generateRoundKey(key);
+
     /* Accept */
     while (1) {
         int cliFd;
@@ -240,7 +286,9 @@ int main() {
         int cliLen = sizeof(cliAddr);
         cliFd = accept(servFd, (struct sockaddr *)&cliAddr, (socklen_t *)&cliLen);
 
-        send(cliFd, "HELLO", sizeof("HELLO"), 0);
+        char msgToSend[1024] = {'\0'};
+        strcpy(msgToSend, encode("HELLO", roundKey).data());
+        send(cliFd, msgToSend, sizeof(msgToSend), 0);
 
         struct client cli;
         cli.cliFd = cliFd;
