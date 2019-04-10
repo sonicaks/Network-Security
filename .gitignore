@@ -1,2 +1,5 @@
 # Ignore *.out files
 *.out
+
+# Ignore .vscode
+.vscode/
